@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>배당 랭킹</title>
+<style>
+:root{
+  color-scheme:light;
+  --plane:#f9f9f7; --surface:#fcfcfb; --line:#e1e0d9; --axis:#c3c2b7;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --up:#d03b3b; --down:#2a78d6;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+  --chip:#efeee8;
+}
+@media (prefers-color-scheme:dark){
+  :root:where(:not([data-theme=light])){
+    color-scheme:dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --line:#2c2c2a; --axis:#383835;
+    --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+    --up:#e5544f; --down:#3987e5; --chip:#232321;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding:16px;padding-block:20px}
+h1{font-size:17px;margin:0;letter-spacing:-.01em}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;
+  font-weight:600;font-size:12.5px;border:1px solid transparent;white-space:nowrap}
+.pill .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.pill.ok{color:var(--good);border-color:color-mix(in srgb,var(--good) 40%,transparent)}
+.pill.ok .dot{background:var(--good)}
+.pill.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+.pill.warn .dot{background:var(--warn)}
+.sub{color:var(--muted);font-size:12.5px;margin-top:6px}
+.sub b{color:var(--ink-2);font-weight:600}
+
+/* 필터 --------------------------------------------------------------- */
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{appearance:none;border:0;background:transparent;color:var(--ink-2);
+  font:inherit;font-size:12.5px;padding:6px 11px;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed=true]{background:var(--chip);color:var(--ink);font-weight:650}
+input[type=search],input[type=number]{font:inherit;font-size:13px;padding:6px 10px;
+  border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0}
+input[type=search]{flex:1 1 170px;max-width:260px}
+input[type=number]{width:84px}
+label.inline{display:inline-flex;align-items:center;gap:6px;color:var(--ink-2);font-size:12.5px;white-space:nowrap}
+.count{color:var(--muted);font-size:12.5px;margin-left:auto}
+
+/* 표 ----------------------------------------------------------------- */
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+th{position:sticky;top:0;background:var(--surface);z-index:1;
+  font-size:12px;font-weight:600;color:var(--ink-2);cursor:pointer;user-select:none;letter-spacing:.02em}
+th:hover{color:var(--ink)}
+th .ar{opacity:.35;font-size:10px;margin-left:3px}
+th[aria-sort] .ar{opacity:1}
+td.name,th.name{text-align:left}
+td.name a{color:inherit;text-decoration:none;font-weight:600}
+td.name a:hover{text-decoration:underline}
+.mkt{display:inline-block;font-size:11px;color:var(--muted);border:1px solid var(--line);
+  border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px;font-weight:500}
+.up{color:var(--up)} .down{color:var(--down)} .muted{color:var(--muted)}
+.g{display:inline-block;min-width:20px;padding:1px 6px;border-radius:5px;font-size:12px;font-weight:650}
+.g1{color:#fff;background:var(--good)} .g2{color:var(--good);border:1px solid var(--good)}
+.g3{color:var(--muted);border:1px solid var(--line)}
+.g4{color:var(--warn);border:1px solid var(--warn)} .g5{color:#fff;background:var(--crit)}
+.g0{color:var(--muted)}
+td.hist{text-align:left}
+.spark{vertical-align:middle;margin-right:7px}
+.years{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+.empty{padding:34px 10px;text-align:center;color:var(--muted)}
+footer{color:var(--muted);font-size:12px;text-align:center;padding:6px 0 2px}
+footer a{color:inherit}
+@media (max-width:640px){ .wrap{padding:12px} .count{margin-left:0;width:100%} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <div class="top">
+      <h1>배당 랭킹</h1>
+      <span class="pill" id="status"><span class="dot"></span><span id="statusText">불러오는 중…</span></span>
+    </div>
+    <div class="sub" id="meta">data.json 을 읽는 중…</div>
+  </div>
+
+  <div class="card">
+    <div class="filters">
+      <div class="seg" id="mkt">
+        <button data-v="" aria-pressed="true">전체</button>
+        <button data-v="코스피" aria-pressed="false">코스피</button>
+        <button data-v="코스닥" aria-pressed="false">코스닥</button>
+      </div>
+      <div class="seg" id="qual">
+        <button data-v="" aria-pressed="true">전체</button>
+        <button data-v="A" aria-pressed="false">A</button>
+        <button data-v="AB" aria-pressed="false">A~B</button>
+        <button data-v="ABC" aria-pressed="false">A~C</button>
+      </div>
+      <label class="inline"><input type="checkbox" id="noTrap"> 함정 징후 숨기기</label>
+      <label class="inline"><input type="checkbox" id="noFalling"> 하락 추세 숨기기</label>
+      <label class="inline">배당률 <input type="number" id="minY" min="0" step="0.5" placeholder="0"> % 이상</label>
+      <label class="inline"><input type="checkbox" id="hasHist"> 연속 배당 5년 이상</label>
+      <input type="search" id="q" placeholder="종목명 · 코드 검색" autocomplete="off">
+      <span class="count" id="count"></span>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tablewrap">
+      <table>
+        <thead><tr id="head"></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty" hidden>조건에 맞는 종목이 없습니다.</div>
+  </div>
+
+  <footer>
+    <span id="foot"></span>
+  </footer>
+</div>
+
+<script>
+'use strict';
+
+var COLS = [
+  { k:'name',         t:'종목',     cls:'name', sort:function(a,b){ return a.name.localeCompare(b.name,'ko'); } },
+  { k:'quality',      t:'배당품질', num:true },
+  { k:'yield_pct',    t:'배당률',   num:true },
+  { k:'payout_ratio', t:'배당성향', num:true },
+  { k:'consecutive_years', t:'연속배당', num:true },
+  { k:'roe',          t:'ROE',      num:true },
+  { k:'price_position',  t:'52주위치', num:true },
+  { k:'two_year_return', t:'2년',      num:true },
+  { k:'market_cap',   t:'시총',     num:true },
+  { k:'price',        t:'시가',     num:true },
+  { k:'grade',        t:'재무등급', num:true, asc:true },
+  { k:'hist',         t:'배당 추세', cls:'hist', nosort:true }
+];
+
+var DATA = null;
+var sortKey = 'quality', sortDesc = true;
+var filters = { mkt:'', qual:'', minY:'', q:'', hasHist:false, noTrap:false, noFalling:false };
+
+/* ---- 저장/복원: 필터를 매번 다시 잡지 않게 ---- */
+function saveState(){
+  try { localStorage.setItem('divrank', JSON.stringify({ f:filters, k:sortKey, d:sortDesc })); } catch(e){}
+}
+function loadState(){
+  try {
+    var s = JSON.parse(localStorage.getItem('divrank') || 'null');
+    if (!s) return;
+    if (s.f) { for (var k in filters) if (k in s.f) filters[k] = s.f[k]; }
+    if (s.k) sortKey = s.k;
+    if (typeof s.d === 'boolean') sortDesc = s.d;
+  } catch(e){}
+}
+
+/* ---- 표시 헬퍼 ---- */
+function won(n){ return n == null ? '—' : Math.round(n).toLocaleString('ko-KR'); }
+/* 시가총액을 조/억 단위로. 자릿수가 커서 원 단위로 두면 읽히지 않는다. */
+function cap(n){
+  if (n == null) return '<span class="muted">—</span>';
+  if (n >= 1e12) return (n / 1e12).toFixed(1) + '조';
+  return Math.round(n / 1e8).toLocaleString('ko-KR') + '억';
+}
+function pct(n, sign){
+  if (n == null) return '—';
+  var s = (sign && n > 0 ? '+' : '') + n.toFixed(2) + '%';
+  return s;
+}
+function years(d){ return Object.keys(d || {}).sort(); }
+
+/* 배당 추세 스파크라인. 값이 2개 미만이면 그리지 않는다. */
+function spark(divs){
+  var ys = years(divs);
+  if (ys.length < 2) return '';
+  var vals = ys.map(function(y){ return divs[y]; });
+  var max = Math.max.apply(null, vals), min = Math.min.apply(null, vals);
+  var w = 54, h = 16, span = (max - min) || 1;
+  var pts = vals.map(function(v,i){
+    var x = (i / (vals.length - 1)) * (w - 2) + 1;
+    var y = h - 1 - ((v - min) / span) * (h - 2);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  var rising = vals[vals.length-1] >= vals[0];
+  var c = rising ? 'var(--up)' : 'var(--down)';
+  return '<svg class="spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" aria-hidden="true">' +
+         '<polyline fill="none" stroke="'+c+'" stroke-width="1.5" stroke-linejoin="round" points="'+pts+'"/></svg>';
+}
+
+function histCell(s){
+  var ys = years(s.dividends);
+  if (!ys.length) return '<span class="muted">—</span>';
+  var tail = ys.slice(-4).map(function(y){ return y.slice(2) + ':' + Math.round(s.dividends[y]); }).join(' ');
+  return spark(s.dividends) + '<span class="years">' + tail + '</span>';
+}
+
+/* 52주 범위 내 위치. 바닥권 파랑, 고점권 빨강. 마우스를 올리면 사유가 나온다. */
+function posCell(s){
+  if (s.price_position == null) return '<span class="muted">—</span>';
+  var p = s.price_position;
+  var cls = p < 25 ? 'down' : (p >= 75 ? 'up' : '');
+  var tip = '52주 최저 대비 현재 위치';
+  if (s.price_drawdown != null) tip += ' · 최고 대비 ' + s.price_drawdown.toFixed(0) + '%';
+  if (s.price_note_detail) tip += ' · ' + s.price_note_detail;
+  var tag = s.price_note ? ' <span class="pnote">' + s.price_note + '</span>' : '';
+  return '<span class="' + cls + '" title="' + esc(tip) + '">' + Math.round(p) + '%</span>' + tag;
+}
+
+function qualCell(s){
+  var g = s.quality_grade || 'E';
+  return '<span class="q q' + g + '" title="배당 품질 ' + s.quality + '점">' + g + '</span> ' +
+         '<span class="qn">' + s.quality + '</span>';
+}
+
+function gradeCell(s){
+  if (!s.evaluated) return '<span class="g g0">—</span>';
+  return '<span class="g g' + s.grade + '" title="점수 ' + s.point + '">' + s.grade + '</span>';
+}
+
+/* ---- 필터 + 정렬 ---- */
+function visible(){
+  var q = filters.q.trim().toLowerCase();
+  var minY = parseFloat(filters.minY);
+  return DATA.stocks.filter(function(s){
+    if (filters.mkt && s.market !== filters.mkt) return false;
+    if (filters.qual && filters.qual.indexOf(s.quality_grade) < 0) return false;
+    if (filters.noTrap && s.trap && s.trap.length) return false;
+    if (filters.noFalling && s.price_note === '하락') return false;
+    if (!isNaN(minY) && s.yield_pct < minY) return false;
+    if (filters.hasHist && (s.consecutive_years || 0) < 5) return false;
+    if (q && s.name.toLowerCase().indexOf(q) < 0 && s.code.indexOf(q) < 0) return false;
+    return true;
+  });
+}
+
+function sorted(rows){
+  var col = COLS.filter(function(c){ return c.k === sortKey; })[0] || COLS[3];
+  var out = rows.slice();
+  out.sort(function(a,b){
+    var r;
+    if (col.sort) r = col.sort(a,b);
+    else {
+      var x = a[col.k], y = b[col.k];
+      if (x == null && y == null) r = 0;
+      else if (x == null) r = 1;        // 값 없음은 항상 뒤로
+      else if (y == null) r = -1;
+      else r = x - y;
+    }
+    return sortDesc ? -r : r;
+  });
+  return out;
+}
+
+/* ---- 렌더 ---- */
+function renderHead(){
+  document.getElementById('head').innerHTML = COLS.map(function(c){
+    var active = c.k === sortKey;
+    var ar = c.nosort ? '' : '<span class="ar">' + (active ? (sortDesc ? '▼' : '▲') : '▽') + '</span>';
+    return '<th class="' + (c.cls||'') + '"' +
+           (c.nosort ? '' : ' data-k="' + c.k + '"' + (active ? ' aria-sort="' + (sortDesc?'descending':'ascending') + '"' : '')) +
+           '>' + c.t + ar + '</th>';
+  }).join('');
+  Array.prototype.forEach.call(document.querySelectorAll('th[data-k]'), function(th){
+    th.addEventListener('click', function(){
+      var k = th.getAttribute('data-k');
+      if (k === sortKey) sortDesc = !sortDesc;
+      else { sortKey = k; var c = COLS.filter(function(x){return x.k===k;})[0]; sortDesc = !c.asc; }
+      saveState(); render();
+    });
+  });
+}
+
+function render(){
+  var rows = sorted(visible());
+  document.getElementById('count').textContent = rows.length.toLocaleString('ko-KR') + '종목';
+  document.getElementById('empty').hidden = rows.length > 0;
+
+  var html = rows.map(function(s){
+    var trap = (s.trap && s.trap.length)
+      ? ' <span class="trap" title="' + esc(s.trap.join(', ')) + '">⚠</span>' : '';
+    var pref = s.preferred
+      ? ' <span class="pref" title="우선주 — 배당률이 보통주보다 높은 게 정상이고 의결권이 없다">우</span>' : '';
+    return '<tr>' +
+      '<td class="name"><a href="https://m.stock.naver.com/domestic/stock/' + s.code + '/total" target="_blank" rel="noopener">' +
+        esc(s.name) + '</a><span class="mkt">' + s.market + '</span>' + pref + trap + '</td>' +
+      '<td>' + qualCell(s) + '</td>' +
+      '<td><b>' + s.yield_pct.toFixed(2) + '%</b></td>' +
+      '<td>' + (s.payout_ratio == null ? '<span class="muted">—</span>' : s.payout_ratio.toFixed(1) + '%') + '</td>' +
+      '<td title="총 기록 ' + s.paid_years + '년">' + s.consecutive_years + '년</td>' +
+      '<td>' + (s.roe == null ? '<span class="muted">—</span>' : s.roe.toFixed(1) + '%') + '</td>' +
+      '<td>' + posCell(s) + '</td>' +
+      '<td class="' + ((s.two_year_return || 0) >= 0 ? 'up' : 'down') + '">' +
+        (s.two_year_return == null ? '<span class="muted">—</span>' : (s.two_year_return >= 0 ? '+' : '') + s.two_year_return.toFixed(0) + '%') + '</td>' +
+      '<td>' + cap(s.market_cap) + '</td>' +
+      '<td>' + won(s.price) + '</td>' +
+      '<td>' + gradeCell(s) + '</td>' +
+      '<td class="hist">' + histCell(s) + '</td>' +
+    '</tr>';
+  }).join('');
+  document.getElementById('body').innerHTML = html;
+  renderHead();
+}
+
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ---- 신선도 ---- */
+function freshness(iso){
+  var t = new Date(iso.replace(' ', 'T'));
+  var hours = (Date.now() - t.getTime()) / 36e5;
+  var el = document.getElementById('status'), tx = document.getElementById('statusText');
+  // 하루 2회 갱신이므로 18시간이 넘으면 배포가 밀린 것으로 본다.
+  el.className = 'pill ' + (hours > 18 ? 'warn' : 'ok');
+  tx.textContent = hours < 1 ? '방금 갱신' :
+                   hours < 24 ? Math.floor(hours) + '시간 전' :
+                   Math.floor(hours / 24) + '일 전';
+  return t;
+}
+
+/* ---- 입력 배선 ---- */
+function wireSeg(id, key){
+  var box = document.getElementById(id);
+  Array.prototype.forEach.call(box.querySelectorAll('button'), function(b){
+    b.addEventListener('click', function(){
+      filters[key] = b.getAttribute('data-v');
+      Array.prototype.forEach.call(box.querySelectorAll('button'), function(x){
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+      saveState(); render();
+    });
+  });
+}
+function syncSeg(id, key){
+  var box = document.getElementById(id);
+  Array.prototype.forEach.call(box.querySelectorAll('button'), function(b){
+    b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === filters[key]));
+  });
+}
+
+function wire(){
+  wireSeg('mkt', 'mkt');
+  wireSeg('qual', 'qual');
+  var q = document.getElementById('q'), minY = document.getElementById('minY'), hh = document.getElementById('hasHist');
+  q.addEventListener('input', function(){ filters.q = q.value; saveState(); render(); });
+  minY.addEventListener('input', function(){ filters.minY = minY.value; saveState(); render(); });
+  hh.addEventListener('change', function(){ filters.hasHist = hh.checked; saveState(); render(); });
+  q.value = filters.q; minY.value = filters.minY; hh.checked = filters.hasHist;
+  var nt = document.getElementById('noTrap');
+  nt.addEventListener('change', function(){ filters.noTrap = nt.checked; saveState(); render(); });
+  nt.checked = filters.noTrap;
+  var nf = document.getElementById('noFalling');
+  nf.addEventListener('change', function(){ filters.noFalling = nf.checked; saveState(); render(); });
+  nf.checked = filters.noFalling;
+  syncSeg('mkt','mkt'); syncSeg('qual','qual');
+}
+
+function load(){
+  fetch('data.json?t=' + Date.now(), { cache:'no-store' })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(d){
+      DATA = d;
+      var t = freshness(d.generated_at);
+      var c = d.counts, cr = d.criteria;
+      var ex = c.excluded_risky ? ' · 관리종목·거래정지 <b>' + c.excluded_risky + '종목</b> 제외' : '';
+      var mp = cr.min_price ? ' · 주가 <b>' + cr.min_price.toLocaleString('ko-KR') + '원</b> 이상' : '';
+      document.getElementById('meta').innerHTML =
+        '<b>' + c.ranked.toLocaleString('ko-KR') + '종목</b> · 전체 ' + c.universe.toLocaleString('ko-KR') +
+        '종목 중 배당수익률 <b>' + cr.min_yield + '%</b> 이상' + mp + ex + ' · ' + cr.markets.join('·') +
+        '<br>' + t.toLocaleString('ko-KR') + ' 기준 · ' + d.source;
+      document.getElementById('foot').innerHTML =
+        esc(cr.quality_note || '') + '<br>' + esc(cr.grade_note);
+      wire();
+      render();
+    })
+    .catch(function(err){
+      document.getElementById('status').className = 'pill warn';
+      document.getElementById('statusText').textContent = '오류';
+      document.getElementById('meta').textContent = 'data.json 을 읽지 못했습니다 (' + err.message + ')';
+    });
+}
+
+loadState();
+load();
+</script>
+</body>
+</html>
